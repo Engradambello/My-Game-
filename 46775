@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Classic Rialo Mining — Single Page</title>
+  <style>
+    :root{--bg:#0f1720;--panel:#0b1220;--accent:#4CAF50;--muted:#9aa4b2;--card:#0f2333}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#071021 0%, #0b1726 100%);color:#dbe7f0}
+    .app{max-width:980px;margin:18px auto;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.06));box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;gap:12px}
+    header h1{font-size:18px;margin:0}
+
+    /* layout */
+    .layout{display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:12px}
+    .panel{background:var(--panel);padding:14px;border-radius:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)}
+
+    canvas{width:100%;height:auto;border-radius:8px;background:linear-gradient(180deg,#052634,#0b2430);display:block}
+
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    button{background:var(--accent);border:none;color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#243444;color:var(--muted)}
+
+    /* right column */
+    .right{display:flex;flex-direction:column;gap:10px}
+    .box{padding:12px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
+    .muted{color:var(--muted);font-size:13px}
+
+    /* username modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center}
+    .modal{background:white;color:#111;padding:20px;border-radius:12px;width:320px;max-width:90%}
+    .modal h2{margin:0 0 8px}
+    .modal input{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;margin:6px 0}
+
+    footer{margin-top:14px;display:flex;justify-content:space-between;align-items:center}
+
+    /* responsive */
+    @media (max-width:900px){
+      .layout{grid-template-columns:1fr}
+      .right{order:2}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <img src="" alt="icon" style="width:36px;height:36px;border-radius:8px;background:linear-gradient(90deg,#2b6 0%,#48b 100%)">
+      <h1>Classic Rialo Mining — Single page demo</h1>
+    </header>
+
+    <div class="layout">
+      <div class="panel">
+        <canvas id="canvas" width="750" height="570"></canvas>
+
+        <div class="controls">
+          <button id="startBtn">Start Game</button>
+          <button id="pauseBtn" class="secondary">Pause</button>
+          <button id="restartBtn" class="secondary">Restart</button>
+          <button id="muteBtn" class="secondary">Mute</button>
+          <div style="flex:1"></div>
+          <div class="muted">Score: <span id="score">0</span></div>
+        </div>
+
+        <footer>
+          <div class="muted">Tips: Click canvas to fire hook. Collect coins.</div>
+          <div class="muted">Mobile-friendly — scale to your screen.</div>
+        </footer>
+      </div>
+
+      <aside class="right">
+        <div class="box">
+          <strong>Sounds & controls</strong>
+          <p class="muted">This demo references the original game's sound file names. Put your audio files in a <code>/sound/</code> folder next to this HTML file.</p>
+          <ul class="muted" id="soundList" style="padding-left:16px;margin:8px 0"></ul>
+          <div style="margin-top:8px"><button id="playScene" class="secondary">Play Scene Music</button></div>
+        </div>
+
+        <div class="box">
+          <strong>About</strong>
+          <p class="muted">This single page combines a canvas game loop, audio preloads, and a small UI (username modal, restart). It's a starter scaffold you can extend with the original game's logic.</p>
+        </div>
+
+        <div class="box">
+          <strong>Developer notes</strong>
+          <p class="muted">Place these files in the same folder and open <code>single-page-rialo-mining.html</code> in a modern browser. Local audio playback may require serving via a local server in some browsers.</p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Username modal -->
+    <div id="usernameModal" class="modal-backdrop" style="display:none">
+      <div class="modal">
+        <h2>Enter Your Name</h2>
+        <input id="usernameInput" placeholder="Enter your username..." />
+        <div style="text-align:right;margin-top:8px">
+          <button id="saveUsername">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio elements (preload) -->
+    <!-- Put your actual files under /sound/ with these names -->
+    <audio id="a_start_scene" src="sound/start-scene.mp3" preload="auto"></audio>
+    <audio id="a_play_scene" src="sound/play-scene.mp3" preload="auto"></audio>
+    <audio id="a_shop_scene" src="sound/shop-scene.mp3" preload="auto"></audio>
+    <audio id="a_buy_item" src="sound/buy-item.wav" preload="auto"></audio>
+    <audio id="a_drag_hook" src="sound/drag-hook.wav" preload="auto"></audio>
+    <audio id="a_endgame_lose" src="sound/endgame-lose.wav" preload="auto"></audio>
+    <audio id="a_endgame_win" src="sound/endgame-win.wav" preload="auto"></audio>
+    <audio id="a_explosion" src="sound/explosion.wav" preload="auto"></audio>
+    <audio id="a_mission_passed" src="sound/mission-passed.wav" preload="auto"></audio>
+    <audio id="a_new_level" src="sound/new-level.wav" preload="auto"></audio>
+    <audio id="a_pull_hook" src="sound/pull-hook.wav" preload="auto"></audio>
+    <audio id="a_plus_money" src="sound/plus-money.wav" preload="auto"></audio>
+    <audio id="a_super_power" src="sound/super-power.wav" preload="auto"></audio>
+
+  </div>
+
+  <script>
+    // Simple single-file scaffold: small mining-like demo
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const scoreEl = document.getElementById('score');
+    const usernameModal = document.getElementById('usernameModal');
+    const saveUsername = document.getElementById('saveUsername');
+    const usernameInput = document.getElementById('usernameInput');
+    const soundList = document.getElementById('soundList');
+    const playScene = document.getElementById('playScene');
+
+    // audio references
+    const audios = {
+      start: document.getElementById('a_start_scene'),
+      play: document.getElementById('a_play_scene'),
+      shop: document.getElementById('a_shop_scene'),
+      buy: document.getElementById('a_buy_item'),
+      drag: document.getElementById('a_drag_hook'),
+      lose: document.getElementById('a_endgame_lose'),
+      win: document.getElementById('a_endgame_win'),
+      explosion: document.getElementById('a_explosion'),
+      mission: document.getElementById('a_mission_passed'),
+      newlevel: document.getElementById('a_new_level'),
+      pull: document.getElementById('a_pull_hook'),
+      plus: document.getElementById('a_plus_money'),
+      super: document.getElementById('a_super_power')
+    };
+
+    // populate sound list UI
+    Object.keys(audios).forEach(k=>{
+      const a = audios[k];
+      const li = document.createElement('li');
+      li.textContent = a.src.split('/').pop() || k;
+      soundList.appendChild(li);
+    });
+
+    let running = false;
+    let muted = false;
+    let score = 0;
+
+    // simple game state: hook + coin spawn
+    const state = {
+      hook: {x: canvas.width/2, y: 0, vy: 0, length: 0, firing: false, maxLength: 420},
+      coins: []
+    };
+
+    function spawnCoin(){
+      const r = 12 + Math.random()*16;
+      const x = 40 + Math.random()*(canvas.width-80);
+      const y = 240 + Math.random()*220;
+      state.coins.push({x,y,r,vy:0});
+    }
+
+    function reset(){
+      state.coins = [];
+      for(let i=0;i<6;i++) spawnCoin();
+      state.hook = {x: canvas.width/2, y: 0, vy:0, length:0, firing:false, maxLength:420};
+      score = 0; scoreEl.textContent = score;
+    }
+
+    function toggleMute(){
+      muted = !muted;
+      Object.values(audios).forEach(a=>{a.muted = muted});
+      muteBtn.textContent = muted? 'Unmute': 'Mute';
+    }
+
+    function play(id){ if(!muted && audios[id]){ audios[id].currentTime=0; audios[id].play().catch(()=>{}); } }
+
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // background grid
+      ctx.fillStyle = '#071827';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // coins
+      state.coins.forEach(c=>{
+        ctx.beginPath();
+        ctx.fillStyle = '#f6d24a';
+        ctx.ellipse(c.x,c.y,c.r,c.r*0.85,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.stroke();
+      });
+
+      // hook
+      ctx.beginPath();
+      ctx.strokeStyle='#b9d3e0';
+      ctx.lineWidth=3;
+      ctx.moveTo(canvas.width/2,20);
+      ctx.lineTo(state.hook.x, state.hook.length + 20);
+      ctx.stroke();
+
+      // hook head
+      ctx.beginPath(); ctx.fillStyle='#8db2c4';
+      ctx.rect(state.hook.x-8, state.hook.length + 12, 16, 12); ctx.fill();
+
+      // HUD
+      ctx.fillStyle='#dbe7f0'; ctx.font='14px Arial';
+      ctx.fillText('Player: ' + (localStorage.getItem('player') || 'Guest'), 12,18);
+      ctx.fillText('Score: ' + score, 12, 36);
+    }
+
+    function update(dt){
+      // hook mechanics
+      const h = state.hook;
+      if(h.firing){
+        if(h.length < h.maxLength){ h.length += 300 * dt; }
+        else h.firing = false;
+      } else {
+        if(h.length > 0){
+          h.length -= 260 * dt;
+          if(h.length < 10) h.length = 0;
+        }
+      }
+
+      // check collision with coins
+      if(h.length > 0){
+        const hx = h.x; const hy = h.length + 20;
+        for(let i=state.coins.length-1;i>=0;i--){
+          const c = state.coins[i];
+          const dx = hx - c.x; const dy = hy - c.y; const d = Math.sqrt(dx*dx+dy*dy);
+          if(d < c.r + 6){
+            play('plus');
+            score += Math.round(10 + Math.random()*40);
+            scoreEl.textContent = score;
+            state.coins.splice(i,1);
+            // spawn new coin
+            spawnCoin();
+          }
+        }
+      }
+    }
+
+    let last = 0;
+    function loop(ts){
+      if(!running) return; // stop loop
+      const dt = Math.min((ts - last)/1000, 0.05);
+      update(dt);
+      draw();
+      last = ts;
+      requestAnimationFrame(loop);
+    }
+
+    // events
+    canvas.addEventListener('click', e=>{
+      if(!running) return;
+      state.hook.firing = true;
+      play('drag');
+    });
+
+    canvas.addEventListener('mousemove', e=>{
+      // allow aiming by moving mouse (desktop)
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      state.hook.x = x;
+    });
+
+    // touch support
+    canvas.addEventListener('touchstart', e=>{ e.preventDefault(); if(!running) return; state.hook.firing=true; play('drag'); });
+    canvas.addEventListener('touchmove', e=>{ const t = e.touches[0]; const rect = canvas.getBoundingClientRect(); const x = (t.clientX - rect.left) * (canvas.width / rect.width); state.hook.x = x; });
+
+    startBtn.addEventListener('click', ()=>{
+      usernameModal.style.display = 'flex';
+      play('start');
+    });
+
+    saveUsername.addEventListener('click', ()=>{
+      const v = usernameInput.value.trim() || 'Player';
+      localStorage.setItem('player', v);
+      usernameModal.style.display = 'none';
+      startGame();
+    });
+
+    pauseBtn.addEventListener('click', ()=>{
+      running = !running;
+      pauseBtn.textContent = running? 'Pause': 'Resume';
+      if(running) { last = performance.now(); requestAnimationFrame(loop); }
+    });
+
+    restartBtn.addEventListener('click', ()=>{ reset(); play('newlevel'); if(!running){ running=true; last=performance.now(); requestAnimationFrame(loop); } });
+
+    muteBtn.addEventListener('click', toggleMute);
+
+    playScene.addEventListener('click', ()=> play('play'));
+
+    // initialization
+    reset();
+    // show modal only if no saved name
+    if(!localStorage.getItem('player')) usernameModal.style.display = 'flex';
+
+    function startGame(){
+      running = true; last = performance.now(); requestAnimationFrame(loop);
+      play('play');
+    }
+
+    // helpful: start automatically if name exists
+    if(localStorage.getItem('player')) startGame();
+
+    // Resize canvas for high-DPI displays
+    function resizeForDPI(){
+      const ratio = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth * ratio;
+      const h = canvas.clientHeight * ratio;
+      canvas.width = Math.floor(w);
+      canvas.height = Math.floor(h);
+    }
+    window.addEventListener('resize', ()=>{ resizeForDPI(); draw(); });
+    resizeForDPI(); draw();
+
+  </script>
+</body>
+</html>
